@@ -24,6 +24,16 @@ export interface Post {
     radius: number;
 }
 
+export interface Particle {
+    pos: Vector2;
+    vel: Vector2;
+    life: number; // 0 to 1
+    maxLife: number;
+    color: string;
+    size: number;
+    decay: number;
+}
+
 export interface GameState {
     player: Player;
     cpu: Player;
@@ -37,6 +47,12 @@ export interface GameState {
         away: number;
     };
     isPlaying: boolean;
+    // Juice
+    particles: Particle[];
+    screenShake: {
+        intensity: number;
+        duration: number;
+    };
 }
 
 export const GAME_CONSTANTS = {

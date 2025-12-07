@@ -18,3 +18,10 @@ A "one-more-try" arcade game that encourages small micro-transactions (or fake c
 - No Space Shooters.
 - Must be mobile responsive (touch controls).
 - Must have "juice" (screenshake, particles, punchy audio).
+
+## Art Direction: "Neo-Retro Soccer"
+**Inspiration**: *Nintendo World Cup* (NES), *River City Ransom*.
+- **Look**: Chibi characters (big heads, expressive faces), chunky pixels, vibrant colors.
+- **Vibe**: Rowdy, chaotic, but readable.
+- **UI**: Bold, blocky fonts. 8-bit aesthetic but smooth 60fps animations.
+- **Perspecitve**: Top-down / Side-scroller hybrid (like the NES classic).

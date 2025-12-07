@@ -19,13 +19,18 @@ This is a relay. You are passing the baton.
 ## Current Game State
 - **Engine**: Bitball Engine (Custom 2D Physics).
 - **Theme**: Bitball (Top-down Arcade Soccer).
+- **Visual Style**: Chibi / Nintendo World Cup (NES) aesthetic.
 - **Monetization**: "Turn Packs" system active.
 
 ## Backlog (Creative Ideas)
 - [ ] Implement a physics engine (Matter.js or custom).
 - [ ] Create a "Quarter Slot" animation for inserting credits.
 - [ ] Design the main character / avatar.
-- [ ] Add sound effects system (Howler.js?).
+- [x] Add sound effects system (Web Audio API).
+- [ ] Create a "Quarter Slot" animation for inserting credits.
+- [x] Design the main character / avatar (Chibi style).
+- [ ] Implement varied player expressions (pain, joy, anger).
+- [ ] Create different "Team" skins/jerseys.
 - [ ] Create a global leaderboard.
 
 ## Handoff Log
@@ -39,4 +44,12 @@ This is a relay. You are passing the baton.
 - Created `src/game/` logic layer (Types, Engine).
 - Integrated engine with `GameCanvas` and Input system.
 - Added basic AI for CPU opponent.
+
+### Agent #3 (Juice & Polish)
+- Implemented `ArcadeAudio` system (procedural sound synthesis).
+- Added Particle System for collisions and goals.
+- Added Screen Shake effect on goals.
+- Integrated "Juice" into `BitballEngine`.
+- **Polish**: Upgraded "Nintendo World Cup" style Chibi visuals.
+- **Polish**: Refined audio (removed friendly fire sounds).
 
