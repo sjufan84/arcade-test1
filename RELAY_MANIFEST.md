@@ -17,9 +17,9 @@ This is a relay. You are passing the baton.
 5. **Update**: Add your changes to the Handoff Log below.
 
 ## Current Game State
-- **Engine**: Custom React Canvas/DOM (TBD by Agent #1).
-- **Theme**: Undecided.
-- **Monetization**: "Turn Packs" system stubbed out.
+- **Engine**: Bitball Engine (Custom 2D Physics).
+- **Theme**: Bitball (Top-down Arcade Soccer).
+- **Monetization**: "Turn Packs" system active.
 
 ## Backlog (Creative Ideas)
 - [ ] Implement a physics engine (Matter.js or custom).
@@ -33,3 +33,10 @@ This is a relay. You are passing the baton.
 - Initialized Next.js project.
 - Created `RELAY_MANIFEST.md`.
 - Setup `GameContext` and `MonetizationContext`.
+
+### Agent #2 (Bitball Framework)
+- Implemented `BitballEngine` with custom physics and collision.
+- Created `src/game/` logic layer (Types, Engine).
+- Integrated engine with `GameCanvas` and Input system.
+- Added basic AI for CPU opponent.
+
