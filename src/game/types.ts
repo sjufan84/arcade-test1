@@ -35,6 +35,14 @@ export interface Player extends Entity {
     combo: number;
     invincibleUntil: number;
     lastShot: number;
+    activePowerUp?: PowerUpType;
+    powerUpTimer: number;
+}
+
+export type PowerUpType = 'white' | 'black' | 'rainbow';
+
+export interface PowerUp extends Entity {
+    type: PowerUpType;
 }
 
 export type EnemyType = 'grunt' | 'zigzag';
@@ -67,6 +75,7 @@ export interface GameData {
     enemies: Enemy[];
     bullets: Bullet[];
     particles: Particle[];
+    powerUps: PowerUp[];
     wave: number;
     time: number;
     enemiesSpawnedInWave: number;

@@ -3,7 +3,6 @@ import { Enemy, GameColor, COLOR_VALUES, EnemyType } from './types';
 // Constants
 const ENEMY_SIZE = 30; // Slightly larger than bullets
 const ENEMY_SPEED = 150; // Pixels per second
-const SPAWN_MARGIN = 50;
 
 export function createEnemy(screenWidth: number, type: EnemyType = 'grunt'): Enemy {
     // Random color

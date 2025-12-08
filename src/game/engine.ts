@@ -2,11 +2,9 @@
 
 import {
     GameData,
-    GameState,
     GameColor,
-    Bullet,
-    Particle,
-    COLOR_VALUES
+    COLOR_VALUES,
+    PowerUpType
 } from './types';
 import {
     createPlayer,
@@ -35,6 +33,12 @@ export class GameEngine {
     private spawnInterval: number = 1.0; // Seconds between spawns
     private waveTransitionTimer: number = 0;
 
+    // Visual Polish
+    private shakeIntensity: number = 0;
+    private shakeDecay: number = 5.0; // How fast shake subsides
+    private stars: { x: number; y: number; size: number; speed: number; brightness: number }[] = [];
+
+
     // Define waves: count, spawnRate, valid types
     private readonly WAVE_CONFIG = [
         { count: 10, rate: 1.5, types: ['grunt'] },       // Wave 1
@@ -48,6 +52,19 @@ export class GameEngine {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d')!;
         this.gameData = this.createInitialState();
+        this.initStars();
+    }
+
+    private initStars(): void {
+        for (let i = 0; i < 100; i++) {
+            this.stars.push({
+                x: Math.random() * this.canvas.width,
+                y: Math.random() * this.canvas.height,
+                size: Math.random() < 0.9 ? 1 : 2,
+                speed: 10 + Math.random() * 40,
+                brightness: Math.random()
+            });
+        }
     }
 
     private createInitialState(): GameData {
@@ -57,6 +74,7 @@ export class GameEngine {
             enemies: [],
             bullets: [],
             particles: [],
+            powerUps: [],
             wave: 1,
             time: 0,
             enemiesSpawnedInWave: 0,
@@ -142,7 +160,22 @@ export class GameEngine {
         this.gameData.time = now;
 
         this.update(deltaTime, now);
+
+        // Apply screenshake
+        this.ctx.save();
+        if (this.shakeIntensity > 0) {
+            const dx = (Math.random() - 0.5) * this.shakeIntensity * 2;
+            const dy = (Math.random() - 0.5) * this.shakeIntensity * 2;
+            this.ctx.translate(dx, dy);
+        }
+
         this.render(now);
+        this.ctx.restore();
+
+        // Decay shake
+        if (this.shakeIntensity > 0) {
+            this.shakeIntensity = Math.max(0, this.shakeIntensity - this.shakeDecay * deltaTime);
+        }
 
         this.animationId = requestAnimationFrame(this.loop);
     };
@@ -150,7 +183,7 @@ export class GameEngine {
     private update(deltaTime: number, now: number): void {
         if (this.gameData.state !== 'playing' && this.gameData.state !== 'wave_clear') return;
 
-        const { player, bullets, particles } = this.gameData;
+        const { player, bullets, particles, powerUps } = this.gameData;
 
         // Check collisions
         this.checkCollisions(deltaTime, now);
@@ -185,7 +218,7 @@ export class GameEngine {
                 this.enemySpawnTimer -= deltaTime;
                 if (this.enemySpawnTimer <= 0) {
                     // Pick random type allowed in this wave
-                    const typeOptions = currentWaveConfig.types as any[];
+                    const typeOptions = currentWaveConfig.types as EnemyType[];
                     const type = typeOptions[Math.floor(Math.random() * typeOptions.length)];
 
                     this.gameData.enemies.push(createEnemy(this.canvas.width, type));
@@ -233,19 +266,43 @@ export class GameEngine {
             particle.position.x += particle.velocity.x * deltaTime;
             particle.position.y += particle.velocity.y * deltaTime;
             particle.life -= deltaTime;
-            particle.scale = particle.life / particle.maxLife;
+            particle.scale = particle.life / particle.maxLife; // Linear fade
+
+            // Apply drag for more "physics" feel (optional, but nice)
+            particle.velocity.x *= 0.95;
+            particle.velocity.y *= 0.95;
+
             if (particle.life <= 0) {
                 particle.active = false;
+            }
+        }
+
+        // Update powerups
+        for (const pu of powerUps) {
+            pu.position.y += 100 * deltaTime; // Drifts down
+            if (pu.position.y > this.canvas.height + 50) {
+                pu.active = false;
+            }
+        }
+
+        // Update Stars
+        const speedMultiplier = this.gameData.state === 'wave_clear' ? 5 : 1; // Warp speed during transition
+        for (const star of this.stars) {
+            star.y += star.speed * speedMultiplier * deltaTime;
+            if (star.y > this.canvas.height) {
+                star.y = 0;
+                star.x = Math.random() * this.canvas.width;
             }
         }
 
         // Clean up inactive entities
         this.gameData.bullets = bullets.filter(b => b.active);
         this.gameData.particles = particles.filter(p => p.active);
+        this.gameData.powerUps = powerUps.filter(p => p.active);
     }
 
     private checkCollisions(deltaTime: number, now: number): void {
-        const { player, enemies, bullets } = this.gameData;
+        const { player, enemies, bullets, powerUps } = this.gameData;
 
         // 1. Bullets vs Enemies
         for (const bullet of bullets) {
@@ -264,7 +321,11 @@ export class GameEngine {
                     bullet.active = false;
                     this.spawnHitEffect(bullet.position.x, bullet.position.y, bullet.color);
 
-                    if (bullet.color === enemy.color) {
+                    // Logic: Match color OR Prismatic powerup active
+                    const isMatch = bullet.color === enemy.color;
+                    const isPrismatic = player.activePowerUp === 'white';
+
+                    if (isMatch || isPrismatic) {
                         // Match! Kill enemy
                         enemy.active = false;
                         player.score += enemy.points * (1 + player.combo);
@@ -272,6 +333,13 @@ export class GameEngine {
 
                         // Spawn explosion
                         this.spawnExplosion(enemy.position.x, enemy.position.y, enemy.color);
+                        this.shakeIntensity = Math.min(this.shakeIntensity + 2, 10); // Small shake on kill
+
+                        // Spawn PowerUp Chance (10%)
+                        if (Math.random() < 0.1) {
+                            this.spawnPowerUp(enemy.position.x, enemy.position.y);
+                        }
+
                     } else {
                         // Mismatch!
                         player.combo = 0; // Reset combo on miss? Design doc says "chain same-color kills".
@@ -303,10 +371,43 @@ export class GameEngine {
                         this.gameData.state = 'gameover';
                     } else {
                         // Screen shake or trauma could go here
+                        this.shakeIntensity = 20; // BIG SHAKE
                     }
                 }
             }
         }
+
+        // 3. PowerUps vs Player
+        for (const pu of powerUps) {
+            if (!pu.active) continue;
+
+            const dx = player.position.x - pu.position.x;
+            const dy = player.position.y - pu.position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < player.size + pu.size) {
+                pu.active = false;
+                player.activePowerUp = pu.type;
+                player.powerUpTimer = 5000; // 5 seconds
+
+                // Visual feedback for pickup?
+                this.spawnHitEffect(pu.position.x, pu.position.y, 'red'); // just reuse red/generic for now
+            }
+        }
+    }
+
+    private spawnPowerUp(x: number, y: number): void {
+        const types: PowerUpType[] = ['white', 'black', 'rainbow'];
+        const type = types[Math.floor(Math.random() * types.length)];
+
+        this.gameData.powerUps.push({
+            id: `pu-${Date.now()}-${Math.random()}`,
+            position: { x, y },
+            velocity: { x: 0, y: 100 },
+            size: 15,
+            active: true,
+            type: type
+        });
     }
 
     private spawnHitEffect(x: number, y: number, color: GameColor): void {
@@ -383,7 +484,9 @@ export class GameEngine {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Draw subtle grid
-        this.drawGrid();
+        // this.drawGrid(); // Replaced by stars
+        this.drawStars();
+
 
         if (gameData.state === 'menu') {
             this.drawMenu();
@@ -397,6 +500,7 @@ export class GameEngine {
 
         // Draw game entities
         this.drawEnemies();
+        this.drawPowerUps();
         this.drawBullets();
         this.drawParticles();
         drawPlayer(ctx, gameData.player, now);
@@ -432,6 +536,18 @@ export class GameEngine {
         ctx.restore();
     }
 
+    private drawStars(): void {
+        const { ctx, stars } = this;
+        ctx.fillStyle = '#fff';
+        for (const star of stars) {
+            ctx.globalAlpha = star.brightness * 0.8;
+            ctx.beginPath();
+            ctx.rect(star.x, star.y, star.size, star.size);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
     private drawGrid(): void {
         const { ctx, canvas } = this;
         ctx.strokeStyle = 'rgba(50, 50, 70, 0.3)';
@@ -456,6 +572,59 @@ export class GameEngine {
         const { ctx, gameData } = this;
         for (const enemy of gameData.enemies) {
             drawEnemy(ctx, enemy);
+        }
+    }
+
+    private drawPowerUps(): void {
+        const { ctx, gameData } = this;
+        for (const pu of gameData.powerUps) {
+            ctx.save();
+            ctx.translate(pu.position.x, pu.position.y);
+
+            // Animation pulse
+            const pulse = Math.sin(gameData.time / 200) * 0.2 + 1;
+            ctx.scale(pulse, pulse);
+
+            // Halo
+            ctx.shadowBlur = 15;
+
+            let color = '#fff';
+            let char = '?';
+
+            if (pu.type === 'white') {
+                color = '#fff';
+                char = 'P'; // Prismatic
+                ctx.shadowColor = '#fff';
+            } else if (pu.type === 'black') {
+                color = '#333';
+                char = 'V'; // Void
+                ctx.shadowColor = '#000';
+            } else if (pu.type === 'rainbow') {
+                const hue = (gameData.time / 5) % 360;
+                color = `hsl(${hue}, 100%, 70%)`;
+                char = 'R'; // Rapid
+                ctx.shadowColor = color;
+            }
+
+            // Orb
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(0, 0, pu.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Icon/Text
+            ctx.fillStyle = pu.type === 'white' ? '#000' : '#fff';
+            ctx.font = 'bold 12px "Segoe UI"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, 0, 1);
+
+            ctx.restore();
         }
     }
 
@@ -586,8 +755,6 @@ export class GameEngine {
         // Score
         ctx.textAlign = 'left';
         ctx.font = 'bold 24px "Segoe UI", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.font = 'bold 24px "Segoe UI", sans-serif';
         ctx.fillStyle = '#fff';
         ctx.fillText(`Score: ${player.score}`, 20, 35);
 
@@ -601,6 +768,33 @@ export class GameEngine {
             ctx.fillStyle = COLOR_VALUES[player.color];
             ctx.font = 'bold 24px "Segoe UI", sans-serif';
             ctx.fillText(`x${player.combo} COMBO`, 20, 90);
+        }
+
+        // PowerUp Status
+        if (player.activePowerUp && player.powerUpTimer > 0) {
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 18px "Segoe UI", sans-serif';
+
+            const seconds = Math.ceil(player.powerUpTimer / 1000);
+            let text = '';
+            let color = '#fff';
+
+            if (player.activePowerUp === 'white') {
+                text = `PRISMATIC: ${seconds}s`;
+                color = '#fff';
+            } else if (player.activePowerUp === 'black') {
+                text = `VOID DECAY: ${seconds}s`; // Creative name
+                color = '#888';
+            } else if (player.activePowerUp === 'rainbow') {
+                text = `HYPER FIRE: ${seconds}s`;
+                const hue = (player.powerUpTimer / 10) % 360;
+                color = `hsl(${hue}, 100%, 70%)`;
+            }
+
+            ctx.fillStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+            ctx.fillText(text, canvas.width / 2, 80);
         }
 
         // Health

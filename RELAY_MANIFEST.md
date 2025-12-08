@@ -46,10 +46,10 @@ Pick from these or invent your own:
 - [x] Game over / restart flow
 
 ### Visual Polish
-- [ ] Particle effects on hits
-- [ ] Screen shake on damage
+- [x] Particle effects on hits
+- [x] Screen shake on damage
 - [ ] Color trail behind player
-- [ ] Background star field
+- [x] Background star field
 - [ ] UI: Score display, health bar
 
 ### Advanced Features
@@ -97,3 +97,6 @@ npm run lint     # Check code style
 | 2 | 2024-12-08 | Agent 2 | Added enemy spawning, movement, and rendering |
 | 3 | 2024-12-08 | Agent 3 | Implemented collision, combat logic, scoring, and game over state |
 | 4 | 2025-12-07 | Agent 4 | implemented Wave System and Zigzag enemies |
+| 5 | 2025-12-07 | Agent 5 | Implemented screen shake, star field, and polished particles |
+| 6 | 2025-12-07 | Agent 6 | Implemented Power-ups (Prismatic, Void, Rapid Fire) |
+

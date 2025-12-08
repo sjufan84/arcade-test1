@@ -28,6 +28,8 @@ export function createPlayer(canvasWidth: number, canvasHeight: number): Player 
         combo: 0,
         invincibleUntil: 0,
         lastShot: 0,
+        activePowerUp: undefined,
+        powerUpTimer: 0,
     };
 }
 
@@ -63,6 +65,14 @@ export function updatePlayer(
     const halfSize = player.size / 2;
     player.position.x = Math.max(halfSize, Math.min(canvasWidth - halfSize, player.position.x));
     player.position.y = Math.max(halfSize, Math.min(canvasHeight - halfSize, player.position.y));
+
+    // PowerUp Timer
+    if (player.activePowerUp) {
+        player.powerUpTimer -= deltaTime * 1000;
+        if (player.powerUpTimer <= 0) {
+            player.activePowerUp = undefined;
+        }
+    }
 }
 
 export function switchColor(player: Player, color: GameColor): void {
@@ -70,7 +80,13 @@ export function switchColor(player: Player, color: GameColor): void {
 }
 
 export function tryShoot(player: Player, now: number): Bullet | null {
-    if (now - player.lastShot < FIRE_RATE) return null;
+    // Black orb (Void) prevents shooting
+    if (player.activePowerUp === 'black') return null;
+
+    // Rainbow streak (Rapid Fire) triples fire rate
+    const currentRate = player.activePowerUp === 'rainbow' ? FIRE_RATE / 3 : FIRE_RATE;
+
+    if (now - player.lastShot < currentRate) return null;
 
     player.lastShot = now;
 
@@ -89,9 +105,15 @@ export function tryShoot(player: Player, now: number): Bullet | null {
 export function damagePlayer(player: Player, now: number): boolean {
     if (now < player.invincibleUntil) return false;
 
+    // Black orb (Void) makes player invincible
+    if (player.activePowerUp === 'black') return false;
+
     player.health--;
     player.combo = 0;
     player.invincibleUntil = now + INVINCIBILITY_DURATION;
+
+    // Lose powerup on hit? Maybe strict, but fair.
+    // player.activePowerUp = undefined; 
 
     return player.health <= 0;
 }
@@ -101,7 +123,7 @@ export function drawPlayer(
     player: Player,
     now: number
 ): void {
-    const { position, size, color } = player;
+    const { position, size, color, activePowerUp } = player;
     const isInvincible = now < player.invincibleUntil;
 
     // Flicker when invincible
@@ -109,6 +131,29 @@ export function drawPlayer(
 
     ctx.save();
     ctx.translate(position.x, position.y);
+
+    // PowerUp Aura
+    if (activePowerUp) {
+        ctx.save();
+        const pulse = Math.sin(now / 100) * 0.2 + 0.8;
+        if (activePowerUp === 'white') {
+            ctx.shadowColor = '#fff';
+            ctx.strokeStyle = '#fff';
+        } else if (activePowerUp === 'black') {
+            ctx.shadowColor = '#000'; // Hard to see on black bg?
+            ctx.strokeStyle = '#555';
+        } else if (activePowerUp === 'rainbow') {
+            const hue = (now / 5) % 360;
+            ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+            ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+        }
+        ctx.shadowBlur = 20 * pulse;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
 
     // Glow effect
     ctx.shadowColor = COLOR_GLOW[color];
@@ -121,7 +166,7 @@ export function drawPlayer(
     ctx.lineTo(size * 0.7, size * 0.5);
     ctx.closePath();
 
-    ctx.fillStyle = COLOR_VALUES[color];
+    ctx.fillStyle = activePowerUp === 'black' ? '#333' : COLOR_VALUES[color];
     ctx.fill();
 
     // Inner highlight
