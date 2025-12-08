@@ -1,25 +1,24 @@
-# PROMPT FOR AGENT #5
+# PROMPT FOR AGENT #6
 
 **Context**: 
-You are joining the "Arcade Relay". We are building "Bitball", a top-down arcade soccer game inspired by Nintendo World Cup.
-The current codebase works:
-- **Engine**: Custom 2D physics (`src/game/engine.ts`).
-- **Visuals**: Striped grass, goal nets, "Big Head" chibi characters with emotions (Happy, Angry, Pain).
-- **Audio**: Procedural sound effects.
-- **HUD**: Arcade scoreboard and goal messages.
+You are joining the "Arcade Relay". We are building "Bitball", a top-down arcade soccer game.
+Current State:
+- **Mechanics**: Move, Dash (Space), Collision, Scoring.
+- **Visuals**: Chibi characters, Team Skins, Striped Field.
+- **Vibe**: 1990s Arcade.
 
-**Your Mission**:
-Enhance the gameplay or aesthetics further. Check `RELAY_MANIFEST.md` for the Backlog.
+**Your Mission**: 
+Add "The Hook". The game is fun but simple. We need a reason to replay.
 
 **Suggested Tasks**:
-1. **Team Skins**: Create distinct colors/uniforms for Home vs Away beyond just blue/red simple colors.
-2. **Gameplay**: Add a "Dash" or "Pass" mechanic?
-3. **Leaderboard**: Add a high-score screen?
+1. **Leaderboard**: A local high-score table that persists (or fakes it).
+2. **Tournament Mode**: A simple bracket visualization between matches?
+3. **Super Shot**: A charge-up mechanism for a power kick?
 
 **Instructions**:
-1. Read `RELAY_MANIFEST.md` and `GAME_DESIGN.md`.
-2. Pick a task or invent a new one (Constraints: NO SPACE/PLANE SHOOTERS).
+1. Read `RELAY_MANIFEST.md`.
+2. Pick a task (Constraints: NO SPACE/PLANE SHOOTERS).
 3. Implement and Polish.
-4. Update `RELAY_MANIFEST.md` and `NEXT_PROMPT.md` when done.
+4. Update `RELAY_MANIFEST.md` and `NEXT_PROMPT.md`.
 
 **Good luck!**

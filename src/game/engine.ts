@@ -23,16 +23,30 @@ export class BitballEngine {
                 team: 'home',
                 emotion: 'normal',
                 emotionTimer: 0,
+                skin: {
+                    primary: '#60a5fa', // Blue Shirt
+                    secondary: '#ffffff', // White Shorts
+                    skinColor: '#ffdbac',
+                    hairColor: '#4b5563', // Dark Grey
+                },
+                dashCooldown: 0,
             },
             cpu: {
                 pos: { x: FIELD_WIDTH - 100, y: FIELD_HEIGHT / 2 },
                 vel: { x: 0, y: 0 },
                 radius: PLAYER_RADIUS,
                 color: '#ef4444', // red-500
-                speed: GAME_CONSTANTS.PLAYER_SPEED * 0.85, // Creating a slightly slower AI
+                speed: GAME_CONSTANTS.PLAYER_SPEED * 0.85,
                 team: 'away',
                 emotion: 'normal',
                 emotionTimer: 0,
+                skin: {
+                    primary: '#ef4444', // Red Shirt
+                    secondary: '#1f2937', // Dark Grey Shorts
+                    skinColor: '#fca5a5', // Slightly reddish skin
+                    hairColor: '#fcd34d', // Blonde
+                },
+                dashCooldown: 0,
             },
             ball: {
                 pos: { x: FIELD_WIDTH / 2, y: FIELD_HEIGHT / 2 },
@@ -56,6 +70,7 @@ export class BitballEngine {
                 duration: 0,
             },
             goalMessage: null,
+            kickoffTimer: 0,
         };
     }
 
@@ -66,12 +81,24 @@ export class BitballEngine {
     update(deltaTime: number) {
         if (!this.state.isPlaying) return;
 
-        this.updatePlayerVelocity();
-        this.updateAI();
-        this.applyPhysics(deltaTime);
+        const dt = deltaTime; // Short alias
+
         this.updateParticles(deltaTime);
         this.updateScreenShake(deltaTime);
         this.updateTimers(deltaTime);
+
+        // If in kickoff mode (celebration), skip physics/cols
+        if (this.state.kickoffTimer > 0) {
+            this.state.kickoffTimer -= dt;
+            if (this.state.kickoffTimer <= 0) {
+                this.resetPositions();
+            }
+            return;
+        }
+
+        this.updatePlayerVelocity();
+        this.updateAI();
+        this.applyPhysics(deltaTime);
         this.checkCollisions();
         this.checkGoals();
     }
@@ -97,6 +124,10 @@ export class BitballEngine {
                 this.state.goalMessage = null;
             }
         }
+
+        // Update Dash Cooldown
+        if (player.dashCooldown > 0) player.dashCooldown -= dt;
+        if (cpu.dashCooldown > 0) cpu.dashCooldown -= dt;
     }
 
     addParticles(pos: Vector2, color: string, count: number = 10, speed: number = 100) {
@@ -145,13 +176,39 @@ export class BitballEngine {
 
     updatePlayerVelocity() {
         const { player } = this.state;
+
+        // Dash Logic
+        const isDashing = (this.keys[' '] || this.keys['Shift']) && player.dashCooldown <= 0;
+
+        let speed = player.speed;
+        if (isDashing) {
+            speed = GAME_CONSTANTS.PLAYER_DASH_SPEED;
+            player.dashCooldown = GAME_CONSTANTS.PLAYER_DASH_COOLDOWN;
+
+            // Effect
+            this.addParticles(player.pos, '#ffffff', 5, 200);
+            this.audio.playKick(); // Re-using kick sound for dash "woosh" for now
+        }
+
+        // If currently dashing (carry over velocity decay? No, simple arcade movement for now)
+        // Actually for a dash we want a burst.
+        // Let's keep it simple: While holding space, you run FAST, but cooldown applies immediately after start?
+        // Better: Immediate burst that decays or just faster speed while key held but limited by cooldown logic.
+        // Revised: Input triggers dash state.
+
+        // Simple Implementation: If cooldown > 1.2 (just started), apply huge speed
+        if (player.dashCooldown > 1.3) {
+            speed = GAME_CONSTANTS.PLAYER_DASH_SPEED;
+            this.addParticles(player.pos, '#ffffff', 2, 100); // Trail
+        }
+
         player.vel.x = 0;
         player.vel.y = 0;
 
-        if (this.keys['ArrowUp'] || this.keys['w']) player.vel.y = -player.speed;
-        if (this.keys['ArrowDown'] || this.keys['s']) player.vel.y = player.speed;
-        if (this.keys['ArrowLeft'] || this.keys['a']) player.vel.x = -player.speed;
-        if (this.keys['ArrowRight'] || this.keys['d']) player.vel.x = player.speed;
+        if (this.keys['ArrowUp'] || this.keys['w']) player.vel.y = -speed;
+        if (this.keys['ArrowDown'] || this.keys['s']) player.vel.y = speed;
+        if (this.keys['ArrowLeft'] || this.keys['a']) player.vel.x = -speed;
+        if (this.keys['ArrowRight'] || this.keys['d']) player.vel.x = speed;
     }
 
     updateAI() {
@@ -297,7 +354,9 @@ export class BitballEngine {
                 // UI
                 this.state.goalMessage = { text: 'RED GOAL!', color: '#ef4444', timer: 2.0 };
 
-                this.resetPositions();
+                // TRIGGER KICKOFF TIMER
+                this.state.kickoffTimer = 2.0;
+                // DO NOT RESET POSITIONS YET
             } else {
                 // Bounce off back wall
                 ball.pos.x = ball.radius;
@@ -320,7 +379,9 @@ export class BitballEngine {
                 // UI
                 this.state.goalMessage = { text: 'BLUE GOAL!', color: '#3b82f6', timer: 2.0 };
 
-                this.resetPositions();
+                // TRIGGER KICKOFF TIMER
+                this.state.kickoffTimer = 2.0;
+                // DO NOT RESET POSITIONS YET
             } else {
                 // Bounce off back wall
                 ball.pos.x = field.width - ball.radius;
@@ -533,25 +594,25 @@ export class BitballEngine {
         }
 
         // Body (Shirt) - Squircle
-        ctx.fillStyle = player.color;
+        ctx.fillStyle = player.skin.primary;
         const bodyW = r * 1.4;
         const bodyH = r * 1.2;
         ctx.fillRect(x - bodyW / 2, y - r * 0.2 + bob, bodyW, bodyH);
 
-        // Shorts (White or Black)
-        ctx.fillStyle = player.team === 'home' ? '#fff' : '#000';
+        // Shorts
+        ctx.fillStyle = player.skin.secondary;
         ctx.fillRect(x - bodyW / 2, y + r * 0.8 + bob, bodyW, r * 0.3);
 
         // Head (Big!)
-        ctx.fillStyle = '#ffdbac'; // Skin
+        ctx.fillStyle = player.skin.skinColor; // Skin
         const headR = r * 0.9;
         const headY = y - r * 0.6 + bob;
         ctx.beginPath();
         ctx.arc(x, headY, headR, 0, Math.PI * 2);
         ctx.fill();
 
-        // Hair (Brown)
-        ctx.fillStyle = '#5d4037';
+        // Hair
+        ctx.fillStyle = player.skin.hairColor;
         ctx.beginPath();
         ctx.arc(x, headY - 4, headR, Math.PI, Math.PI * 2); // Top half
         ctx.fill();

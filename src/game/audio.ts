@@ -28,9 +28,9 @@ export class ArcadeAudio {
         osc.connect(gain);
         gain.connect(this.ctx.destination);
 
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(150, t);
-        osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+        osc.type = 'triangle'; // Softer than square
+        osc.frequency.setValueAtTime(100, t);
+        osc.frequency.exponentialRampToValueAtTime(10, t + 0.1);
 
         gain.gain.setValueAtTime(0.5, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);

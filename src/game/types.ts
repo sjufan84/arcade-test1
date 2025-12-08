@@ -10,15 +10,6 @@ export interface Entity {
     color: string;
 }
 
-export interface Player extends Entity {
-    speed: number;
-    team: 'home' | 'away'; // home = blue, away = red
-}
-
-export interface Ball extends Entity {
-    friction: number;
-}
-
 export interface Post {
     pos: Vector2;
     radius: number;
@@ -32,6 +23,28 @@ export interface Particle {
     color: string;
     size: number;
     decay: number;
+}
+
+export type Emotion = 'normal' | 'pain' | 'happy' | 'angry';
+
+export interface Player extends Entity {
+    speed: number;
+    team: 'home' | 'away'; // home = blue, away = red
+    emotion: Emotion;
+    emotionTimer: number;
+    // New Visuals
+    skin: {
+        primary: string;
+        secondary: string;
+        skinColor: string;
+        hairColor: string;
+    };
+    // Dash Mechanic
+    dashCooldown: number;
+}
+
+export interface Ball extends Entity {
+    friction: number;
 }
 
 export interface GameState {
@@ -59,6 +72,7 @@ export interface GameState {
         color: string;
         timer: number;
     } | null;
+    kickoffTimer: number;
 }
 
 export const GAME_CONSTANTS = {
@@ -67,15 +81,8 @@ export const GAME_CONSTANTS = {
     PLAYER_RADIUS: 20,
     BALL_RADIUS: 10,
     PLAYER_SPEED: 400, // px per second
+    PLAYER_DASH_SPEED: 1000,
+    PLAYER_DASH_COOLDOWN: 1.5,
     BALL_FRICTION: 0.98,
     GOAL_WIDTH: 150,
 };
-
-export type Emotion = 'normal' | 'pain' | 'happy' | 'angry';
-
-export interface Player extends Entity {
-    speed: number;
-    team: 'home' | 'away'; // home = blue, away = red
-    emotion: Emotion;
-    emotionTimer: number;
-}

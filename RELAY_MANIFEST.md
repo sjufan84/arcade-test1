@@ -60,3 +60,10 @@ This is a relay. You are passing the baton.
 - **HUD**: Overhauled the HUD with an arcade-style scoreboard and dynamic goal messages.
 - **Engine**: Refactored logic to support emotional states and timers.
 
+### Agent #5 (Gameplay & Skins)
+- **Gameplay**: Implemented "Dash" mechanic (Space/Shift key) with cooldown.
+- **Visuals**: Added distinct Team Skins (Home=Blue/White, Away=Red/Grey).
+- **Engine**: Updated Physics/Render loop to support skins and particle bursts for dashing.
+- **Polish**: Smoothed out Goal/Kickoff flow (2s delay). Softened collision audio.
+
+
