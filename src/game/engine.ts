@@ -13,7 +13,8 @@ import {
     updatePlayer,
     switchColor,
     tryShoot,
-    drawPlayer
+    drawPlayer,
+    damagePlayer
 } from './player';
 import {
     createEnemy,
@@ -139,6 +140,9 @@ export class GameEngine {
 
         const { player, bullets, particles } = this.gameData;
 
+        // Check collisions
+        this.checkCollisions(deltaTime, now);
+
         // Update player
         updatePlayer(
             player,
@@ -203,6 +207,115 @@ export class GameEngine {
         // Clean up inactive entities
         this.gameData.bullets = bullets.filter(b => b.active);
         this.gameData.particles = particles.filter(p => p.active);
+    }
+
+    private checkCollisions(deltaTime: number, now: number): void {
+        const { player, enemies, bullets } = this.gameData;
+
+        // 1. Bullets vs Enemies
+        for (const bullet of bullets) {
+            if (!bullet.active) continue;
+
+            for (const enemy of enemies) {
+                if (!enemy.active) continue;
+
+                // Simple circle collision
+                const dx = bullet.position.x - enemy.position.x;
+                const dy = bullet.position.y - enemy.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const minDistance = bullet.size + enemy.size;
+
+                if (distance < minDistance) {
+                    bullet.active = false;
+                    this.spawnHitEffect(bullet.position.x, bullet.position.y, bullet.color);
+
+                    if (bullet.color === enemy.color) {
+                        // Match! Kill enemy
+                        enemy.active = false;
+                        player.score += enemy.points * (1 + player.combo);
+                        player.combo++;
+
+                        // Spawn explosion
+                        this.spawnExplosion(enemy.position.x, enemy.position.y, enemy.color);
+                    } else {
+                        // Mismatch!
+                        player.combo = 0; // Reset combo on miss? Design doc says "chain same-color kills".
+                        // Let's be lenient and only reset on bad hits, or strict.
+                        // "Mismatched: Enemy takes no damage"
+                    }
+                    break; // Bullet hit something, stop checking this bullet
+                }
+            }
+        }
+
+        // 2. Enemies vs Player
+        if (now > player.invincibleUntil) {
+            for (const enemy of enemies) {
+                if (!enemy.active) continue;
+
+                const dx = player.position.x - enemy.position.x;
+                const dy = player.position.y - enemy.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const minDistance = player.size * 0.8 + enemy.size; // Slightly smaller hitbox for player feel
+
+                if (distance < minDistance) {
+                    // Collision!
+                    enemy.active = false; // Enemy kamikazes
+                    this.spawnExplosion(enemy.position.x, enemy.position.y, enemy.color);
+
+                    const isGameOver = damagePlayer(player, now);
+                    if (isGameOver) {
+                        this.gameData.state = 'gameover';
+                    } else {
+                        // Screen shake or trauma could go here
+                    }
+                }
+            }
+        }
+    }
+
+    private spawnHitEffect(x: number, y: number, color: GameColor): void {
+        const colorHex = COLOR_VALUES[color];
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 50 + Math.random() * 50;
+            this.gameData.particles.push({
+                id: `p-hit-${Date.now()}-${i}`,
+                position: { x, y },
+                velocity: {
+                    x: Math.cos(angle) * speed,
+                    y: Math.sin(angle) * speed
+                },
+                size: 2,
+                active: true,
+                color: colorHex,
+                life: 0.1,
+                maxLife: 0.1,
+                scale: 1,
+            });
+        }
+    }
+
+    private spawnExplosion(x: number, y: number, color: GameColor): void {
+        const colorHex = COLOR_VALUES[color];
+        for (let i = 0; i < 10; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 100 + Math.random() * 150;
+            this.gameData.particles.push({
+                id: `p-exp-${Date.now()}-${i}`,
+                position: { x, y },
+                velocity: {
+                    x: Math.cos(angle) * speed,
+                    y: Math.sin(angle) * speed
+                },
+                size: 3 + Math.random() * 3,
+                active: true,
+                color: colorHex,
+                life: 0.3 + Math.random() * 0.2,
+                maxLife: 0.5,
+                scale: 1,
+            });
+        }
     }
 
     private spawnMuzzleFlash(x: number, y: number, color: GameColor): void {

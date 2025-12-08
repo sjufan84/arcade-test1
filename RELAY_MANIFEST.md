@@ -40,10 +40,10 @@ Pick from these or invent your own:
 
 ### Core Gameplay
 - [x] Enemy spawner with wave system
-- [ ] Bullet/projectile system
-- [ ] Collision detection
-- [ ] Scoring & combo multiplier
-- [ ] Game over / restart flow
+- [x] Bullet/projectile system
+- [x] Collision detection
+- [x] Scoring & combo multiplier
+- [x] Game over / restart flow
 
 ### Visual Polish
 - [ ] Particle effects on hits
@@ -95,3 +95,4 @@ npm run lint     # Check code style
 |---|------|-------|--------------|
 | 1 | 2024-12-07 | Agent 1 | Project setup, player ship with color switching |
 | 2 | 2024-12-08 | Agent 2 | Added enemy spawning, movement, and rendering |
+| 3 | 2024-12-08 | Agent 3 | Implemented collision, combat logic, scoring, and game over state |
