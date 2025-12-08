@@ -15,6 +15,11 @@ import {
     tryShoot,
     drawPlayer
 } from './player';
+import {
+    createEnemy,
+    updateEnemy,
+    drawEnemy
+} from './enemy';
 
 export class GameEngine {
     private canvas: HTMLCanvasElement;
@@ -24,6 +29,8 @@ export class GameEngine {
     private lastTime: number = 0;
     private animationId: number = 0;
     private shooting: boolean = false;
+    private enemySpawnTimer: number = 0;
+    private spawnInterval: number = 1.0; // Seconds between spawns
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -141,6 +148,27 @@ export class GameEngine {
             this.canvas.height
         );
 
+        // Spawn enemies
+        this.enemySpawnTimer -= deltaTime;
+        if (this.enemySpawnTimer <= 0) {
+            this.gameData.enemies.push(createEnemy(this.canvas.width));
+            this.enemySpawnTimer = this.spawnInterval;
+            // Slightly decrease interval over time to increase difficulty, capped at 0.5s
+            this.spawnInterval = Math.max(0.2, this.spawnInterval * 0.995);
+        }
+
+        // Update enemies
+        const enemies = this.gameData.enemies;
+        for (const enemy of enemies) {
+            updateEnemy(enemy, deltaTime);
+
+            // Deactivate off-screen enemies
+            if (enemy.position.y > this.canvas.height + 50) {
+                enemy.active = false;
+            }
+        }
+        this.gameData.enemies = enemies.filter(e => e.active);
+
         // Handle shooting
         if (this.shooting) {
             const bullet = tryShoot(player, now);
@@ -220,6 +248,7 @@ export class GameEngine {
         }
 
         // Draw game entities
+        this.drawEnemies();
         this.drawBullets();
         this.drawParticles();
         drawPlayer(ctx, gameData.player, now);
@@ -243,6 +272,13 @@ export class GameEngine {
             ctx.moveTo(0, y);
             ctx.lineTo(canvas.width, y);
             ctx.stroke();
+        }
+    }
+
+    private drawEnemies(): void {
+        const { ctx, gameData } = this;
+        for (const enemy of gameData.enemies) {
+            drawEnemy(ctx, enemy);
         }
     }
 

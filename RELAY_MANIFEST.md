@@ -39,7 +39,7 @@ src/
 Pick from these or invent your own:
 
 ### Core Gameplay
-- [ ] Enemy spawner with wave system
+- [x] Enemy spawner with wave system
 - [ ] Bullet/projectile system
 - [ ] Collision detection
 - [ ] Scoring & combo multiplier
@@ -94,3 +94,4 @@ npm run lint     # Check code style
 | # | Date | Agent | Contribution |
 |---|------|-------|--------------|
 | 1 | 2024-12-07 | Agent 1 | Project setup, player ship with color switching |
+| 2 | 2024-12-08 | Agent 2 | Added enemy spawning, movement, and rendering |
