@@ -37,10 +37,13 @@ export interface Player extends Entity {
     lastShot: number;
 }
 
+export type EnemyType = 'grunt' | 'zigzag';
+
 export interface Enemy extends Entity {
     color: GameColor;
     health: number;
     points: number;
+    type: EnemyType;
 }
 
 export interface Bullet extends Entity {
@@ -56,7 +59,7 @@ export interface Particle extends Entity {
     scale: number;
 }
 
-export type GameState = 'menu' | 'playing' | 'gameover';
+export type GameState = 'menu' | 'playing' | 'gameover' | 'wave_clear';
 
 export interface GameData {
     state: GameState;
@@ -66,4 +69,5 @@ export interface GameData {
     particles: Particle[];
     wave: number;
     time: number;
+    enemiesSpawnedInWave: number;
 }

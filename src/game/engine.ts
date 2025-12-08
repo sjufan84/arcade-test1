@@ -21,6 +21,7 @@ import {
     updateEnemy,
     drawEnemy
 } from './enemy';
+import { EnemyType } from './types'; // Import needed type
 
 export class GameEngine {
     private canvas: HTMLCanvasElement;
@@ -32,6 +33,16 @@ export class GameEngine {
     private shooting: boolean = false;
     private enemySpawnTimer: number = 0;
     private spawnInterval: number = 1.0; // Seconds between spawns
+    private waveTransitionTimer: number = 0;
+
+    // Define waves: count, spawnRate, valid types
+    private readonly WAVE_CONFIG = [
+        { count: 10, rate: 1.5, types: ['grunt'] },       // Wave 1
+        { count: 15, rate: 1.2, types: ['grunt', 'zigzag'] }, // Wave 2
+        { count: 20, rate: 1.0, types: ['grunt', 'zigzag'] }, // Wave 3
+        { count: 30, rate: 0.8, types: ['grunt', 'zigzag', 'zigzag'] }, // Wave 4 (harder)
+        { count: 50, rate: 0.6, types: ['grunt', 'zigzag'] }, // Wave 5
+    ];
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -48,6 +59,7 @@ export class GameEngine {
             particles: [],
             wave: 1,
             time: 0,
+            enemiesSpawnedInWave: 0,
         };
     }
 
@@ -136,7 +148,7 @@ export class GameEngine {
     };
 
     private update(deltaTime: number, now: number): void {
-        if (this.gameData.state !== 'playing') return;
+        if (this.gameData.state !== 'playing' && this.gameData.state !== 'wave_clear') return;
 
         const { player, bullets, particles } = this.gameData;
 
@@ -152,13 +164,36 @@ export class GameEngine {
             this.canvas.height
         );
 
-        // Spawn enemies
-        this.enemySpawnTimer -= deltaTime;
-        if (this.enemySpawnTimer <= 0) {
-            this.gameData.enemies.push(createEnemy(this.canvas.width));
-            this.enemySpawnTimer = this.spawnInterval;
-            // Slightly decrease interval over time to increase difficulty, capped at 0.5s
-            this.spawnInterval = Math.max(0.2, this.spawnInterval * 0.995);
+        // Wave Logic
+        const currentWaveConfig = this.WAVE_CONFIG[this.gameData.wave - 1] || this.WAVE_CONFIG[this.WAVE_CONFIG.length - 1];
+
+        if (this.gameData.state === 'wave_clear') {
+            this.waveTransitionTimer -= deltaTime;
+            if (this.waveTransitionTimer <= 0) {
+                this.startNextWave();
+            }
+        } else if (this.gameData.state === 'playing') {
+            // Check if wave is done spawning
+            if (this.gameData.enemiesSpawnedInWave >= currentWaveConfig.count) {
+                // Wave complete condition: all enemies spawned AND killed
+                if (this.gameData.enemies.length === 0) {
+                    this.gameData.state = 'wave_clear';
+                    this.waveTransitionTimer = 3.0; // 3 seconds between waves
+                }
+            } else {
+                // Spawn enemies
+                this.enemySpawnTimer -= deltaTime;
+                if (this.enemySpawnTimer <= 0) {
+                    // Pick random type allowed in this wave
+                    const typeOptions = currentWaveConfig.types as any[];
+                    const type = typeOptions[Math.floor(Math.random() * typeOptions.length)];
+
+                    this.gameData.enemies.push(createEnemy(this.canvas.width, type));
+                    this.gameData.enemiesSpawnedInWave++;
+
+                    this.enemySpawnTimer = currentWaveConfig.rate;
+                }
+            }
         }
 
         // Update enemies
@@ -366,6 +401,35 @@ export class GameEngine {
         this.drawParticles();
         drawPlayer(ctx, gameData.player, now);
         this.drawHUD();
+
+        if (gameData.state === 'wave_clear') {
+            this.drawWaveClear();
+        }
+    }
+
+    private startNextWave(): void {
+        this.gameData.wave++;
+        this.gameData.enemiesSpawnedInWave = 0;
+        this.gameData.state = 'playing';
+        // You could also restore some health here if desired
+    }
+
+    private drawWaveClear(): void {
+        const { ctx, canvas, gameData } = this;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 40px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#3399ff';
+        ctx.shadowBlur = 20;
+        ctx.fillText(`WAVE ${gameData.wave} COMPLETE`, canvas.width / 2, canvas.height / 2 - 50);
+
+        ctx.font = '24px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#888';
+        ctx.shadowBlur = 0;
+        ctx.fillText(`Get ready for Wave ${gameData.wave + 1}...`, canvas.width / 2, canvas.height / 2 + 10);
+        ctx.restore();
     }
 
     private drawGrid(): void {
@@ -522,13 +586,21 @@ export class GameEngine {
         // Score
         ctx.textAlign = 'left';
         ctx.font = 'bold 24px "Segoe UI", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 24px "Segoe UI", sans-serif';
         ctx.fillStyle = '#fff';
         ctx.fillText(`Score: ${player.score}`, 20, 35);
+
+        // Wave Indicators
+        ctx.font = '18px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#aaa';
+        ctx.fillText(`Wave ${gameData.wave}`, 20, 60);
 
         // Combo
         if (player.combo > 1) {
             ctx.fillStyle = COLOR_VALUES[player.color];
-            ctx.fillText(`x${player.combo} COMBO`, 20, 65);
+            ctx.font = 'bold 24px "Segoe UI", sans-serif';
+            ctx.fillText(`x${player.combo} COMBO`, 20, 90);
         }
 
         // Health
