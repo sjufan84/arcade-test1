@@ -53,8 +53,8 @@ Pick from these or invent your own:
 - [ ] UI: Score display, health bar
 
 ### Advanced Features
-- [ ] Power-ups (White=hit all, Black=invincible)
-- [ ] Boss battles
+- [x] Power-ups (White=hit all, Black=invincible)
+- [x] Boss battles
 - [ ] Upgrade shop between waves
 - [ ] Leaderboard integration
 - [ ] Sound effects & music
@@ -99,4 +99,5 @@ npm run lint     # Check code style
 | 4 | 2025-12-07 | Agent 4 | implemented Wave System and Zigzag enemies |
 | 5 | 2025-12-07 | Agent 5 | Implemented screen shake, star field, and polished particles |
 | 6 | 2025-12-07 | Agent 6 | Implemented Power-ups (Prismatic, Void, Rapid Fire) |
+| 7 | 2025-12-08 | Agent 7 | Implemented Boss Battle with new enemy type, shooting logic, and health bar |
 

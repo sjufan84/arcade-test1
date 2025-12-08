@@ -45,13 +45,17 @@ export interface PowerUp extends Entity {
     type: PowerUpType;
 }
 
-export type EnemyType = 'grunt' | 'zigzag';
+export type EnemyType = 'grunt' | 'zigzag' | 'boss';
 
 export interface Enemy extends Entity {
     color: GameColor;
     health: number;
+    maxHealth: number; // Added for health bar
     points: number;
     type: EnemyType;
+    shootCooldown?: number; // Only for shooting enemies
+    bossTier?: number; // Which boss encounter (1st, 2nd, 3rd...)
+    bossPhase?: number; // Current attack phase (1 = normal, 2 = enraged at 50%)
 }
 
 export interface Bullet extends Entity {

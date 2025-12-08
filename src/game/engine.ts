@@ -40,12 +40,18 @@ export class GameEngine {
 
 
     // Define waves: count, spawnRate, valid types
+    // Boss waves are determined dynamically (every 5th wave)
     private readonly WAVE_CONFIG = [
         { count: 10, rate: 1.5, types: ['grunt'] },       // Wave 1
         { count: 15, rate: 1.2, types: ['grunt', 'zigzag'] }, // Wave 2
         { count: 20, rate: 1.0, types: ['grunt', 'zigzag'] }, // Wave 3
-        { count: 30, rate: 0.8, types: ['grunt', 'zigzag', 'zigzag'] }, // Wave 4 (harder)
-        { count: 50, rate: 0.6, types: ['grunt', 'zigzag'] }, // Wave 5
+        { count: 30, rate: 0.8, types: ['grunt', 'zigzag', 'zigzag'] }, // Wave 4
+        // Wave 5 = BOSS (handled dynamically)
+        { count: 25, rate: 0.9, types: ['grunt', 'zigzag'] }, // Wave 6 (post-boss)
+        { count: 30, rate: 0.7, types: ['grunt', 'zigzag'] }, // Wave 7
+        { count: 35, rate: 0.6, types: ['zigzag', 'zigzag', 'grunt'] }, // Wave 8
+        { count: 40, rate: 0.5, types: ['zigzag', 'zigzag'] }, // Wave 9
+        // Wave 10 = BOSS #2
     ];
 
     constructor(canvas: HTMLCanvasElement) {
@@ -197,8 +203,7 @@ export class GameEngine {
             this.canvas.height
         );
 
-        // Wave Logic
-        const currentWaveConfig = this.WAVE_CONFIG[this.gameData.wave - 1] || this.WAVE_CONFIG[this.WAVE_CONFIG.length - 1];
+        // Wave Logic (config used in non-boss waves below)
 
         if (this.gameData.state === 'wave_clear') {
             this.waveTransitionTimer -= deltaTime;
@@ -206,25 +211,46 @@ export class GameEngine {
                 this.startNextWave();
             }
         } else if (this.gameData.state === 'playing') {
-            // Check if wave is done spawning
-            if (this.gameData.enemiesSpawnedInWave >= currentWaveConfig.count) {
-                // Wave complete condition: all enemies spawned AND killed
-                if (this.gameData.enemies.length === 0) {
+            // Check if this is a boss wave (every 5th wave)
+            const isBossWave = this.gameData.wave % 5 === 0;
+            const bossTier = Math.floor(this.gameData.wave / 5); // 1st, 2nd, 3rd boss...
+
+            if (isBossWave) {
+                // Boss wave: spawn single boss if not already spawned
+                if (this.gameData.enemiesSpawnedInWave === 0) {
+                    this.gameData.enemies.push(createEnemy(this.canvas.width, 'boss', bossTier));
+                    this.gameData.enemiesSpawnedInWave = 1;
+                }
+                // Wave complete when boss is dead
+                if (this.gameData.enemies.length === 0 && this.gameData.enemiesSpawnedInWave > 0) {
                     this.gameData.state = 'wave_clear';
-                    this.waveTransitionTimer = 3.0; // 3 seconds between waves
+                    this.waveTransitionTimer = 3.0;
                 }
             } else {
-                // Spawn enemies
-                this.enemySpawnTimer -= deltaTime;
-                if (this.enemySpawnTimer <= 0) {
-                    // Pick random type allowed in this wave
-                    const typeOptions = currentWaveConfig.types as EnemyType[];
-                    const type = typeOptions[Math.floor(Math.random() * typeOptions.length)];
+                // Normal wave logic
+                // Use fallback config for waves beyond defined
+                const configIndex = Math.min(this.gameData.wave - 1, this.WAVE_CONFIG.length - 1);
+                const currentWaveConfig = this.WAVE_CONFIG[configIndex];
+                // Adjust count for later waves (scale up)
+                const waveMultiplier = 1 + Math.floor(this.gameData.wave / 10) * 0.2;
+                const adjustedCount = Math.floor(currentWaveConfig.count * waveMultiplier);
 
-                    this.gameData.enemies.push(createEnemy(this.canvas.width, type));
-                    this.gameData.enemiesSpawnedInWave++;
+                if (this.gameData.enemiesSpawnedInWave >= adjustedCount) {
+                    if (this.gameData.enemies.length === 0) {
+                        this.gameData.state = 'wave_clear';
+                        this.waveTransitionTimer = 3.0;
+                    }
+                } else {
+                    this.enemySpawnTimer -= deltaTime;
+                    if (this.enemySpawnTimer <= 0) {
+                        const typeOptions = currentWaveConfig.types as EnemyType[];
+                        const type = typeOptions[Math.floor(Math.random() * typeOptions.length)];
 
-                    this.enemySpawnTimer = currentWaveConfig.rate;
+                        this.gameData.enemies.push(createEnemy(this.canvas.width, type));
+                        this.gameData.enemiesSpawnedInWave++;
+
+                        this.enemySpawnTimer = currentWaveConfig.rate;
+                    }
                 }
             }
         }
@@ -232,11 +258,40 @@ export class GameEngine {
         // Update enemies
         const enemies = this.gameData.enemies;
         for (const enemy of enemies) {
-            updateEnemy(enemy, deltaTime);
+            updateEnemy(enemy, deltaTime, this.canvas.width);
 
             // Deactivate off-screen enemies
-            if (enemy.position.y > this.canvas.height + 50) {
+            if (enemy.position.y > this.canvas.height + 50 && enemy.type !== 'boss') {
                 enemy.active = false;
+            }
+
+            // Handle Enemy Shooting
+            if (enemy.shootCooldown !== undefined && this.gameData.state === 'playing') {
+                // Check for phase change at 50% HP
+                if (enemy.type === 'boss' && enemy.bossPhase === 1 && enemy.health <= enemy.maxHealth / 2) {
+                    enemy.bossPhase = 2;
+                    // Change color on phase change for visual feedback
+                    const colors: GameColor[] = ['red', 'blue', 'yellow'];
+                    enemy.color = colors[(colors.indexOf(enemy.color) + 1) % 3];
+                    this.shakeIntensity = 15; // Big shake on phase change
+                }
+
+                enemy.shootCooldown -= deltaTime;
+                if (enemy.shootCooldown <= 0) {
+                    this.spawnEnemyBullet(enemy);
+
+                    // Calculate cooldown based on tier and phase
+                    if (enemy.type === 'boss') {
+                        const tier = enemy.bossTier || 1;
+                        const phase = enemy.bossPhase || 1;
+                        // Base: 2.0s, faster per tier, even faster in phase 2
+                        const baseCooldown = Math.max(0.6, 2.0 - (tier - 1) * 0.2);
+                        const phaseMod = phase === 2 ? 0.6 : 1.0; // 40% faster in phase 2
+                        enemy.shootCooldown = baseCooldown * phaseMod + Math.random() * 0.3;
+                    } else {
+                        enemy.shootCooldown = 2.0 + Math.random();
+                    }
+                }
             }
         }
         this.gameData.enemies = enemies.filter(e => e.active);
@@ -304,9 +359,30 @@ export class GameEngine {
     private checkCollisions(deltaTime: number, now: number): void {
         const { player, enemies, bullets, powerUps } = this.gameData;
 
-        // 1. Bullets vs Enemies
+        // 1. Bullets vs Enemies (Player Bullets Only)
         for (const bullet of bullets) {
             if (!bullet.active) continue;
+
+            // NEW: Enemy Bullet hitting Player
+            if (!bullet.isPlayerBullet) {
+                const dx = player.position.x - bullet.position.x;
+                const dy = player.position.y - bullet.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Player hitbox check
+                if (distance < player.size * 0.8 + bullet.size) {
+                    bullet.active = false;
+                    this.spawnHitEffect(player.position.x, player.position.y, bullet.color);
+
+                    const isGameOver = damagePlayer(player, now);
+                    if (isGameOver) {
+                        this.gameData.state = 'gameover';
+                    } else {
+                        this.shakeIntensity = 10;
+                    }
+                }
+                continue; // Skip enemy check for this bullet
+            }
 
             for (const enemy of enemies) {
                 if (!enemy.active) continue;
@@ -394,6 +470,61 @@ export class GameEngine {
                 this.spawnHitEffect(pu.position.x, pu.position.y, 'red'); // just reuse red/generic for now
             }
         }
+    }
+
+    private spawnEnemyBullet(enemy: import('./types').Enemy): void {
+        const { player } = this.gameData;
+        const dx = player.position.x - enemy.position.x;
+        const dy = player.position.y - enemy.position.y;
+
+        // Base angle toward player
+        const baseAngle = Math.atan2(dy, dx);
+
+        // Determine bullet count and spread based on boss phase/tier
+        let bulletCount = 1;
+        let spreadAngle = 0;
+        const speed = 250 + (enemy.bossTier || 0) * 20; // Faster bullets per tier
+
+        if (enemy.type === 'boss') {
+            const phase = enemy.bossPhase || 1;
+            const tier = enemy.bossTier || 1;
+
+            if (phase === 1) {
+                bulletCount = 3 + Math.floor(tier / 2); // 3, 3, 4, 4, 5...
+                spreadAngle = Math.PI / 8; // ~22 degrees
+            } else {
+                // Phase 2: More bullets, wider spread
+                bulletCount = 5 + Math.floor(tier / 2); // 5, 5, 6, 6, 7...
+                spreadAngle = Math.PI / 5; // ~36 degrees
+            }
+        }
+
+        // Spawn bullets in a spread pattern
+        for (let i = 0; i < bulletCount; i++) {
+            let angle = baseAngle;
+            if (bulletCount > 1) {
+                // Distribute bullets evenly across spread
+                const offset = (i - (bulletCount - 1) / 2) * (spreadAngle / (bulletCount - 1) * 2);
+                angle = baseAngle + offset;
+            }
+
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+
+            this.gameData.bullets.push({
+                id: `bullet-enemy-${Date.now()}-${Math.random()}-${i}`,
+                position: { x: enemy.position.x, y: enemy.position.y + enemy.size / 2 },
+                velocity: { x: vx, y: vy },
+                size: 10,
+                active: true,
+                color: enemy.color,
+                damage: 1,
+                isPlayerBullet: false,
+            });
+        }
+
+        // Effect
+        this.spawnMuzzleFlash(enemy.position.x, enemy.position.y + enemy.size / 2, enemy.color);
     }
 
     private spawnPowerUp(x: number, y: number): void {
@@ -816,6 +947,35 @@ export class GameEngine {
         ctx.beginPath();
         ctx.arc(canvas.width / 2, 30, 12, 0, Math.PI * 2);
         ctx.fill();
+
+        // Boss Health Bar
+        const boss = gameData.enemies.find(e => e.type === 'boss');
+        if (boss && boss.active) {
+            const barWidth = 400;
+            const barHeight = 20;
+            const x = (canvas.width - barWidth) / 2;
+            const y = 80; // Below wave/score/combo
+
+            // Background
+            ctx.fillStyle = '#333';
+            ctx.fillRect(x, y, barWidth, barHeight);
+
+            // Health
+            const healthPercent = Math.max(0, boss.health / (boss.maxHealth || 1));
+            ctx.fillStyle = '#ff3366';
+            ctx.fillRect(x, y, barWidth * healthPercent, barHeight);
+
+            // Border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, barWidth, barHeight);
+
+            // Text
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 14px "Segoe UI"';
+            ctx.fillStyle = '#fff';
+            ctx.fillText('BOSS', x + barWidth / 2, y + 15);
+        }
 
         ctx.restore();
     }
