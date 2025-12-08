@@ -1,0 +1,420 @@
+// Core game engine for Chromatic Surge
+
+import {
+    GameData,
+    GameState,
+    GameColor,
+    Bullet,
+    Particle,
+    COLOR_VALUES
+} from './types';
+import {
+    createPlayer,
+    updatePlayer,
+    switchColor,
+    tryShoot,
+    drawPlayer
+} from './player';
+
+export class GameEngine {
+    private canvas: HTMLCanvasElement;
+    private ctx: CanvasRenderingContext2D;
+    private gameData: GameData;
+    private keys: Set<string> = new Set();
+    private lastTime: number = 0;
+    private animationId: number = 0;
+    private shooting: boolean = false;
+
+    constructor(canvas: HTMLCanvasElement) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d')!;
+        this.gameData = this.createInitialState();
+    }
+
+    private createInitialState(): GameData {
+        return {
+            state: 'menu',
+            player: createPlayer(this.canvas.width, this.canvas.height),
+            enemies: [],
+            bullets: [],
+            particles: [],
+            wave: 1,
+            time: 0,
+        };
+    }
+
+    start(): void {
+        this.setupEventListeners();
+        this.lastTime = performance.now();
+        this.loop();
+    }
+
+    stop(): void {
+        cancelAnimationFrame(this.animationId);
+        this.removeEventListeners();
+    }
+
+    private setupEventListeners(): void {
+        window.addEventListener('keydown', this.handleKeyDown);
+        window.addEventListener('keyup', this.handleKeyUp);
+        this.canvas.addEventListener('mousedown', this.handleMouseDown);
+        this.canvas.addEventListener('mouseup', this.handleMouseUp);
+    }
+
+    private removeEventListeners(): void {
+        window.removeEventListener('keydown', this.handleKeyDown);
+        window.removeEventListener('keyup', this.handleKeyUp);
+        this.canvas.removeEventListener('mousedown', this.handleMouseDown);
+        this.canvas.removeEventListener('mouseup', this.handleMouseUp);
+    }
+
+    private handleKeyDown = (e: KeyboardEvent): void => {
+        this.keys.add(e.code);
+
+        // Color switching
+        if (e.code === 'Digit1' || e.code === 'Numpad1') {
+            switchColor(this.gameData.player, 'red');
+        } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+            switchColor(this.gameData.player, 'blue');
+        } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+            switchColor(this.gameData.player, 'yellow');
+        }
+
+        // Shooting
+        if (e.code === 'Space') {
+            this.shooting = true;
+        }
+
+        // Start game
+        if (e.code === 'Space' && this.gameData.state === 'menu') {
+            this.gameData.state = 'playing';
+        }
+
+        // Restart
+        if (e.code === 'KeyR' && this.gameData.state === 'gameover') {
+            this.gameData = this.createInitialState();
+            this.gameData.state = 'playing';
+        }
+    };
+
+    private handleKeyUp = (e: KeyboardEvent): void => {
+        this.keys.delete(e.code);
+        if (e.code === 'Space') {
+            this.shooting = false;
+        }
+    };
+
+    private handleMouseDown = (): void => {
+        if (this.gameData.state === 'menu') {
+            this.gameData.state = 'playing';
+        }
+        this.shooting = true;
+    };
+
+    private handleMouseUp = (): void => {
+        this.shooting = false;
+    };
+
+    private loop = (): void => {
+        const now = performance.now();
+        const deltaTime = (now - this.lastTime) / 1000;
+        this.lastTime = now;
+        this.gameData.time = now;
+
+        this.update(deltaTime, now);
+        this.render(now);
+
+        this.animationId = requestAnimationFrame(this.loop);
+    };
+
+    private update(deltaTime: number, now: number): void {
+        if (this.gameData.state !== 'playing') return;
+
+        const { player, bullets, particles } = this.gameData;
+
+        // Update player
+        updatePlayer(
+            player,
+            this.keys,
+            deltaTime,
+            this.canvas.width,
+            this.canvas.height
+        );
+
+        // Handle shooting
+        if (this.shooting) {
+            const bullet = tryShoot(player, now);
+            if (bullet) {
+                bullets.push(bullet);
+                this.spawnMuzzleFlash(player.position.x, player.position.y - player.size, player.color);
+            }
+        }
+
+        // Update bullets
+        for (const bullet of bullets) {
+            bullet.position.x += bullet.velocity.x * deltaTime;
+            bullet.position.y += bullet.velocity.y * deltaTime;
+
+            // Deactivate off-screen bullets
+            if (bullet.position.y < -20 || bullet.position.y > this.canvas.height + 20) {
+                bullet.active = false;
+            }
+        }
+
+        // Update particles
+        for (const particle of particles) {
+            particle.position.x += particle.velocity.x * deltaTime;
+            particle.position.y += particle.velocity.y * deltaTime;
+            particle.life -= deltaTime;
+            particle.scale = particle.life / particle.maxLife;
+            if (particle.life <= 0) {
+                particle.active = false;
+            }
+        }
+
+        // Clean up inactive entities
+        this.gameData.bullets = bullets.filter(b => b.active);
+        this.gameData.particles = particles.filter(p => p.active);
+    }
+
+    private spawnMuzzleFlash(x: number, y: number, color: GameColor): void {
+        const colorHex = COLOR_VALUES[color];
+        for (let i = 0; i < 5; i++) {
+            const angle = (Math.random() - 0.5) * Math.PI * 0.5 - Math.PI / 2;
+            const speed = 100 + Math.random() * 100;
+            this.gameData.particles.push({
+                id: `particle-${Date.now()}-${i}`,
+                position: { x, y },
+                velocity: {
+                    x: Math.cos(angle) * speed,
+                    y: Math.sin(angle) * speed
+                },
+                size: 4,
+                active: true,
+                color: colorHex,
+                life: 0.2,
+                maxLife: 0.2,
+                scale: 1,
+            });
+        }
+    }
+
+    private render(now: number): void {
+        const { ctx, canvas, gameData } = this;
+
+        // Clear with dark background
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw subtle grid
+        this.drawGrid();
+
+        if (gameData.state === 'menu') {
+            this.drawMenu();
+            return;
+        }
+
+        if (gameData.state === 'gameover') {
+            this.drawGameOver();
+            return;
+        }
+
+        // Draw game entities
+        this.drawBullets();
+        this.drawParticles();
+        drawPlayer(ctx, gameData.player, now);
+        this.drawHUD();
+    }
+
+    private drawGrid(): void {
+        const { ctx, canvas } = this;
+        ctx.strokeStyle = 'rgba(50, 50, 70, 0.3)';
+        ctx.lineWidth = 1;
+
+        const gridSize = 50;
+        for (let x = 0; x < canvas.width; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
+    }
+
+    private drawBullets(): void {
+        const { ctx, gameData } = this;
+
+        for (const bullet of gameData.bullets) {
+            ctx.save();
+            ctx.translate(bullet.position.x, bullet.position.y);
+
+            // Glow
+            ctx.shadowColor = COLOR_VALUES[bullet.color];
+            ctx.shadowBlur = 15;
+
+            // Bullet shape
+            ctx.fillStyle = COLOR_VALUES[bullet.color];
+            ctx.beginPath();
+            ctx.ellipse(0, 0, bullet.size * 0.4, bullet.size, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, bullet.size * 0.15, bullet.size * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+    }
+
+    private drawParticles(): void {
+        const { ctx, gameData } = this;
+
+        for (const particle of gameData.particles) {
+            ctx.save();
+            ctx.globalAlpha = particle.scale;
+            ctx.fillStyle = particle.color;
+            ctx.shadowColor = particle.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(
+                particle.position.x,
+                particle.position.y,
+                particle.size * particle.scale,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    private drawMenu(): void {
+        const { ctx, canvas } = this;
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Title
+        ctx.font = 'bold 48px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#3399ff';
+        ctx.shadowBlur = 20;
+        ctx.fillText('CHROMATIC SURGE', canvas.width / 2, canvas.height / 3);
+
+        // Subtitle
+        ctx.font = '20px "Segoe UI", sans-serif';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#888';
+        ctx.fillText('A Color-Matching Bullet Hell', canvas.width / 2, canvas.height / 3 + 50);
+
+        // Instructions
+        ctx.font = '16px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#ff3366';
+        ctx.shadowColor = '#ff3366';
+        ctx.fillText('1 = RED', canvas.width / 2 - 100, canvas.height / 2 + 20);
+        ctx.fillStyle = '#3399ff';
+        ctx.shadowColor = '#3399ff';
+        ctx.fillText('2 = BLUE', canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillStyle = '#ffcc00';
+        ctx.shadowColor = '#ffcc00';
+        ctx.fillText('3 = YELLOW', canvas.width / 2 + 100, canvas.height / 2 + 20);
+
+        ctx.fillStyle = '#666';
+        ctx.shadowBlur = 0;
+        ctx.fillText('WASD / Arrows to move  •  Space / Click to shoot', canvas.width / 2, canvas.height / 2 + 60);
+
+        // Start prompt
+        ctx.font = '24px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 10;
+        const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+        ctx.globalAlpha = pulse;
+        ctx.fillText('Press SPACE or CLICK to start', canvas.width / 2, canvas.height * 0.75);
+        ctx.globalAlpha = 1;
+    }
+
+    private drawGameOver(): void {
+        const { ctx, canvas, gameData } = this;
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font = 'bold 48px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#ff3366';
+        ctx.shadowColor = '#ff3366';
+        ctx.shadowBlur = 20;
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 3);
+
+        ctx.font = '24px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 0;
+        ctx.fillText(`Final Score: ${gameData.player.score}`, canvas.width / 2, canvas.height / 2);
+
+        ctx.font = '18px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#888';
+        ctx.fillText('Press R to restart', canvas.width / 2, canvas.height * 0.65);
+    }
+
+    private drawHUD(): void {
+        const { ctx, canvas, gameData } = this;
+        const { player } = gameData;
+
+        ctx.save();
+        ctx.shadowBlur = 0;
+
+        // Score
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 24px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`Score: ${player.score}`, 20, 35);
+
+        // Combo
+        if (player.combo > 1) {
+            ctx.fillStyle = COLOR_VALUES[player.color];
+            ctx.fillText(`x${player.combo} COMBO`, 20, 65);
+        }
+
+        // Health
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#fff';
+        ctx.fillText('HP:', canvas.width - 100, 35);
+
+        for (let i = 0; i < player.maxHealth; i++) {
+            ctx.fillStyle = i < player.health ? '#ff3366' : '#333';
+            ctx.beginPath();
+            ctx.arc(canvas.width - 70 + i * 25, 30, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Current color indicator
+        ctx.fillStyle = COLOR_VALUES[player.color];
+        ctx.shadowColor = COLOR_VALUES[player.color];
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, 30, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    resize(width: number, height: number): void {
+        this.canvas.width = width;
+        this.canvas.height = height;
+
+        // Reposition player if needed
+        if (this.gameData.player.position.x > width) {
+            this.gameData.player.position.x = width / 2;
+        }
+        if (this.gameData.player.position.y > height) {
+            this.gameData.player.position.y = height - 100;
+        }
+    }
+}
