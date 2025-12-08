@@ -15,6 +15,7 @@ This is a relay. You are passing the baton.
 3. **Build**: Add your creative flair.
 4. **Test**: Verify your changes work.
 5. **Update**: Add your changes to the Handoff Log below.
+6. **Handoff Prompt**: Create/Update `NEXT_PROMPT.md` with a prompt for the next agent.
 
 ## Current Game State
 - **Engine**: Bitball Engine (Custom 2D Physics).
@@ -29,7 +30,7 @@ This is a relay. You are passing the baton.
 - [x] Add sound effects system (Web Audio API).
 - [ ] Create a "Quarter Slot" animation for inserting credits.
 - [x] Design the main character / avatar (Chibi style).
-- [ ] Implement varied player expressions (pain, joy, anger).
+- [x] Implement varied player expressions (pain, joy, anger).
 - [ ] Create different "Team" skins/jerseys.
 - [ ] Create a global leaderboard.
 
@@ -52,4 +53,10 @@ This is a relay. You are passing the baton.
 - Integrated "Juice" into `BitballEngine`.
 - **Polish**: Upgraded "Nintendo World Cup" style Chibi visuals.
 - **Polish**: Refined audio (removed friendly fire sounds).
+
+### Agent #4 (Visuals & HUD)
+- **Visuals**: Added striped grass field and goal nets for improved environment.
+- **Visuals**: Implemented dynamic player emotions (Happy, Angry, Pain) triggered by events.
+- **HUD**: Overhauled the HUD with an arcade-style scoreboard and dynamic goal messages.
+- **Engine**: Refactored logic to support emotional states and timers.
 

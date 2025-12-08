@@ -53,6 +53,12 @@ export interface GameState {
         intensity: number;
         duration: number;
     };
+    // UI
+    goalMessage: {
+        text: string;
+        color: string;
+        timer: number;
+    } | null;
 }
 
 export const GAME_CONSTANTS = {
@@ -64,3 +70,12 @@ export const GAME_CONSTANTS = {
     BALL_FRICTION: 0.98,
     GOAL_WIDTH: 150,
 };
+
+export type Emotion = 'normal' | 'pain' | 'happy' | 'angry';
+
+export interface Player extends Entity {
+    speed: number;
+    team: 'home' | 'away'; // home = blue, away = red
+    emotion: Emotion;
+    emotionTimer: number;
+}
